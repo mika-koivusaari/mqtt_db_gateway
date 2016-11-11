@@ -11,6 +11,7 @@ from configparser import SafeConfigParser
 from configparser import NoSectionError
 from configparser import NoOptionError
 
+import paho.mqtt.client as mqtt
 from pep3143daemon import DaemonContext, PidFile
 
 def main():
@@ -62,6 +63,7 @@ class App:
     logger = None
     loggerfh = None
     daemon = None
+    mqttclient = None
 
     def reload_program_config(self,signum, frame):
         conf=self.readConfig(self._config_file)
@@ -139,7 +141,7 @@ class App:
         raise SystemExit('Terminating on signal {0}'.format(signum))
 
     def close_resources(self):
-        pass
+        self.mqttclient.close()
 #        if self.db is not None:
 #            self.cursor.close(
 #
@@ -176,9 +178,33 @@ class App:
         self.logger.setLevel(level.get(loggerConf["level"],logging.INFO))
         self.logger.debug('Logger created.')
 
+    # The callback for when the client receives a CONNACK response from the server.
+    def on_connect(self, client, userdata, flags, rc):
+        self.logger.debug('Connected to MQTT broker with result code '+str(rc))
+        # Subscribing in on_connect() means that if we lose the connection and
+        # reconnect then subscriptions will be renewed.
+        client.subscribe('/house/mail')
+
+    # The callback for when a PUBLISH message is received from the server.
+    def on_message(self, client, userdata, msg):
+        self.logger.debug('Got message Topic: '+ msg.topic+' Message: '+str(msg.payload))
+        mailstatus=msg.payload.decode('UTF-8')
+
     def openConnections(self):
         self.logger.debug("openConnections")
         # connect
+        self.mqttclient = mqtt.Client()
+        self.mqttclient.on_connect = self.on_connect
+        self.mqttclient.on_message = self.on_message
+
+        brokerConf = self.config['mqttbroker']
+        self.mqttclient.connect(brokerConf['host'],int(brokerConf['port']), 60)
+        # NonBlocking call that processes network traffic, dispatches callbacks and
+        # handles reconnecting.
+        # Other loop*() functions are available that give a threaded interface and a
+        # manual interface.
+        self.mqttclient.loop_start()
+
 
     def run(self):
         self.openConnections()
@@ -244,20 +270,24 @@ class App:
     def start(self):
         self.config=self.readConfig(self._config_file)
         self.daemon = DaemonContext(pidfile=PidFile(self.pid)
-                               ,signal_map={
-            signal.SIGTERM: self.program_cleanup,
-            signal.SIGHUP: self.terminate,
-            signal.SIGUSR1: self.reload_program_config},
-                                    gid=self.config["daemon"]["groupid"])
+                                   ,signal_map={signal.SIGTERM: self.program_cleanup,
+                                                signal.SIGHUP: self.terminate,
+                                                signal.SIGUSR1: self.reload_program_config}
+#                                   ,files_preserve=(sys.stdout)
+                                   ,stdout=open("/tmp/daemon_stdout.log",'w')
+                                   ,stderr=open("/tmp/daemon_stderr.log",'w')
+                                   ,gid=self.config["daemon"]["groupid"])
         print ("daemon created")
         if self.nodaemon:
             print("no daemon")
             self.daemon.detach_process = False
 #            daemon.stderr = "/tmp/pulse_err.out"
 #            daemon.stdout = "/tmp/pulset.out"
+        else:
+            self.daemon.detach_process = True
         try:
             print("before daemon")
-#            self.daemon.open()
+            self.daemon.open()
             print ("after daemon")
             self.createLogger()
             self.logger.debug('After open')
