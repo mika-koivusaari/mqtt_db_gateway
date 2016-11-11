@@ -87,3 +87,8 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+#config
+mqtt_db_gateway.ini
+
+*.swp

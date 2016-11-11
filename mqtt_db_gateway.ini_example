@@ -1,0 +1,10 @@
+[mqttbroker]
+host = localhost
+port = 1883
+
+[daemon]
+group = dialout
+
+[logger]
+level = DEBUG
+
