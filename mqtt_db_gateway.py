@@ -13,6 +13,7 @@ from configparser import NoOptionError
 
 import paho.mqtt.client as mqtt
 from pep3143daemon import DaemonContext, PidFile
+import sqlalchemy
 
 def main():
     parser = argparse.ArgumentParser(description="MQTT DB gateway")
@@ -64,6 +65,7 @@ class App:
     loggerfh = None
     daemon = None
     mqttclient = None
+    engine = None
 
     def reload_program_config(self,signum, frame):
         conf=self.readConfig(self._config_file)
@@ -84,9 +86,13 @@ class App:
         confData = {}
         #Mandatory configurations
         try:
+            sqlalchemy = {}
+            sqlalchemy['uri'] = config.get('sqlalchemy','uri')
+            sqlalchemy['echo'] = config.getboolean('sqlalchemy','echo')
+
             mqttbroker = {}
             mqttbroker['host'] = config.get('mqttbroker', 'host')
-            mqttbroker['port'] = config.get('mqttbroker', 'port')
+            mqttbroker['port'] = config.getint('mqttbroker', 'port')
 
             daemonData = {}
             groupname = config.get('daemon', 'group')
@@ -124,6 +130,8 @@ class App:
         confData['mqttbroker'] = mqttbroker
         confData['logger'] = loggerData
         confData['daemon'] = daemonData
+        confData['sqlalchemy'] = sqlalchemy
+
         if self.daemon is not None and self.daemon.is_open:
             self.logger.info("Config loaded from " + str(conf_file))
         else:
@@ -141,7 +149,11 @@ class App:
         raise SystemExit('Terminating on signal {0}'.format(signum))
 
     def close_resources(self):
-        self.mqttclient.close()
+        if self.mqttclient is not None:
+            self.mqttclient.close()
+        if self.engine is not None:
+            self.engine.close()
+        
 #        if self.db is not None:
 #            self.cursor.close(
 #
@@ -178,6 +190,9 @@ class App:
         self.logger.setLevel(level.get(loggerConf["level"],logging.INFO))
         self.logger.debug('Logger created.')
 
+#    def read_subscriptions_conf(self):
+
+
     # The callback for when the client receives a CONNACK response from the server.
     def on_connect(self, client, userdata, flags, rc):
         self.logger.debug('Connected to MQTT broker with result code '+str(rc))
@@ -192,6 +207,21 @@ class App:
 
     def openConnections(self):
         self.logger.debug("openConnections")
+
+#        try:
+        self.logger.debug("Open DB connection")
+        sqlalchemyConf = self.config['sqlalchemy']
+        self.logger.debug("URI="+sqlalchemyConf['uri'])
+        self.logger.debug("Echo="+str(sqlalchemyConf['echo']))
+        self.logger.debug("Create engine")
+        self.engine = sqlalchemy.create_engine(sqlalchemyConf['uri'], echo=sqlalchemyConf['echo'])
+        self.logger.debug("Connect")
+        self.engine.connect()
+#        except Exception as ex:
+#            self.logger.error('Error opening DB: '+ str(ex))
+#            self.logger.error(ex)
+
+        self.logger.debug("Open MQTT broker connection.")
         # connect
         self.mqttclient = mqtt.Client()
         self.mqttclient.on_connect = self.on_connect
@@ -281,8 +311,6 @@ class App:
         if self.nodaemon:
             print("no daemon")
             self.daemon.detach_process = False
-#            daemon.stderr = "/tmp/pulse_err.out"
-#            daemon.stdout = "/tmp/pulset.out"
         else:
             self.daemon.detach_process = True
         try:
