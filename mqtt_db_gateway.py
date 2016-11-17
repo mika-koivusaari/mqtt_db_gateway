@@ -212,7 +212,17 @@ class App:
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
         self.logger.debug('Got message Topic: '+ msg.topic+' Message: '+str(msg.payload))
-#        self.logger.debug('Topic is for subcscribe '+userdata)
+        mqttinput = self.config['mqttinput']
+        for key in mqttinput:
+            if mqtt.topic_matches_sub(key,msg.topic):
+                input = mqttinput[key]
+                m=re.match(input.topic_regexp,msg.topic)
+                rawid=m.group('rawid')
+                m=re.match(input.message_regexp,msg.payload.decode('UTF-8'))
+                datetime=m.group('datetime')
+                value=m.group('value')
+                self.logger.debug('rawid='+rawid+' datetime='+datetime+' value='+value)
+
 
     def load_mqtt_input(self):
         self.logger.debug('load_mqtt_input')
