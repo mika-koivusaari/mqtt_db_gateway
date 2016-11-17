@@ -14,6 +14,9 @@ from configparser import NoOptionError
 import paho.mqtt.client as mqtt
 from pep3143daemon import DaemonContext, PidFile
 import sqlalchemy
+from sqlalchemy.orm import sessionmaker
+
+import model
 
 def main():
     parser = argparse.ArgumentParser(description="MQTT DB gateway")
@@ -66,6 +69,7 @@ class App:
     daemon = None
     mqttclient = None
     engine = None
+    Session = None
 
     def reload_program_config(self,signum, frame):
         conf=self.readConfig(self._config_file)
@@ -198,12 +202,28 @@ class App:
         self.logger.debug('Connected to MQTT broker with result code '+str(rc))
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
-        client.subscribe('/house/mail')
+        mqttinput = self.config['mqttinput']
+        self.logger.debug(mqttinput)
+        for key in  mqttinput:
+            input = mqttinput[key]
+            client.subscribe(input.topic)
+            self.logger.debug('Subscribed to '+input.topic)
 
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
         self.logger.debug('Got message Topic: '+ msg.topic+' Message: '+str(msg.payload))
-        mailstatus=msg.payload.decode('UTF-8')
+#        self.logger.debug('Topic is for subcscribe '+userdata)
+
+    def load_mqtt_input(self):
+        self.logger.debug('load_mqtt_input')
+        session = self.Session()
+        mqttInput = {}
+        for instance in session.query(model.Mqtt_input).all():
+            self.logger.debug(instance)
+            mqttInput[instance.topic]=instance
+        self.config['mqttinput'] = mqttInput
+        self.logger.debug('Loaded subscriptions')
+        self.logger.debug(mqttInput)
 
     def openConnections(self):
         self.logger.debug("openConnections")
@@ -217,6 +237,8 @@ class App:
         self.engine = sqlalchemy.create_engine(sqlalchemyConf['uri'], echo=sqlalchemyConf['echo'])
         self.logger.debug("Connect")
         self.engine.connect()
+        self.Session = sessionmaker(bind=self.engine)
+        self.load_mqtt_input()
 #        except Exception as ex:
 #            self.logger.error('Error opening DB: '+ str(ex))
 #            self.logger.error(ex)

@@ -13,4 +13,4 @@ class Mqtt_input(Base):
 
     def __repr__(self):
         return "<Input(topic='%s', topic_regexp='%s', message_regexp='%s', process='%s')>" % (
-                             self.topic, self.topic.regexp, self.message_regexp, self.process)
+                             self.topic, self.topic_regexp, self.message_regexp, self.process)
