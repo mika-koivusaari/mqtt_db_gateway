@@ -215,13 +215,19 @@ class App:
         mqttinput = self.config['mqttinput']
         for key in mqttinput:
             if mqtt.topic_matches_sub(key,msg.topic):
-                input = mqttinput[key]
-                m=re.match(input.topic_regexp,msg.topic)
-                rawid=m.group('rawid')
-                m=re.match(input.message_regexp,msg.payload.decode('UTF-8'))
-                datetime=m.group('datetime')
-                value=m.group('value')
-                self.logger.debug('rawid='+rawid+' datetime='+datetime+' value='+value)
+                try:
+                    input = mqttinput[key]
+                    m=re.match(input.topic_regexp,msg.topic)
+                    rawid=m.group('rawid')
+                    id=self.config['rawidsensorid'][rawid]
+                    m=re.match(input.message_regexp,msg.payload.decode('UTF-8'))
+                    datetime=m.group('datetime')
+                    value=m.group('value')
+                    if input.process_value!=None and input.process_value!="":
+                        value=eval(input.process_value, {"__builtins__": {}}, {"value":int(value),"round":round})
+                    self.logger.debug('rawid='+rawid+' id='+str(id)+' datetime='+datetime+' value='+str(value))
+                except KeyError:
+                    pass
 
 
     def load_mqtt_input(self):
@@ -234,6 +240,18 @@ class App:
         self.config['mqttinput'] = mqttInput
         self.logger.debug('Loaded subscriptions')
         self.logger.debug(mqttInput)
+
+    def load_rawid_sensorid(self):
+        self.logger.debug('load_rawid_sensorid')
+        session = self.Session()
+        rawidsensorid = {}
+        for instance in session.query(model.Rawid_sensorid).all():
+            self.logger.debug(instance)
+            rawidsensorid[instance.rawid]=instance.sensorid
+        self.config['rawidsensorid'] = rawidsensorid
+        self.logger.debug('Loaded rawid sensorid pairs')
+        self.logger.debug(rawidsensorid)
+
 
     def openConnections(self):
         self.logger.debug("openConnections")
@@ -249,6 +267,7 @@ class App:
         self.engine.connect()
         self.Session = sessionmaker(bind=self.engine)
         self.load_mqtt_input()
+        self.load_rawid_sensorid()
 #        except Exception as ex:
 #            self.logger.error('Error opening DB: '+ str(ex))
 #            self.logger.error(ex)
