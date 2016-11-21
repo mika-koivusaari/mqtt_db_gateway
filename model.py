@@ -6,11 +6,17 @@ Base = declarative_base()
 class Mqtt_input(Base):
     __tablename__ = 'mqtt_input'
 
+    PROCESS_TYPE_EXPRESSION = 1
+    PROCESS_TYPE_FORMAT = 2
+    PROCESS_TYPE_EXEC = 3
+
     topic = Column(String, primary_key=True)
     topic_regexp = Column(String)
     message_regexp = Column(String)
     process_value = Column(String)
+    process_value_type = Column(Integer)
     process_time = Column(String)
+    process_time_type = Column(Integer)
 
     def __repr__(self):
         return "<Input(topic='%s', topic_regexp='%s', message_regexp='%s', process_value='%s', process_time='%s')>" % (
