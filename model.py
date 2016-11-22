@@ -1,5 +1,5 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime, Decimal
 
 Base = declarative_base()
 
@@ -31,4 +31,12 @@ class Rawid_sensorid(Base):
     def __repr__(self):
         return "<Rawid_sensorid(rawid='%s', sensorid='%s')>" % (self.rawid, self.sensorid)
 
+class Data(Base):
+    __tablename__ = 'data'
 
+    sensorid = Column(Integer, primary_key = True)
+    time = Column(Date, primary_key = True)
+    value = Column(Decimal)
+
+    def __repr__(self):
+        return "<Data(sensorid='%s', time='%s', value='%s')>" % (self.sensorid, self.time, self.value)
