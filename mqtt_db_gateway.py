@@ -16,6 +16,9 @@ from pep3143daemon import DaemonContext, PidFile
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker
 
+from datetime import datetime
+from dateutil import tz
+
 import model
 
 def main():
@@ -211,6 +214,7 @@ class App:
 
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
+        from datetime import datetime
         self.logger.debug('Got message Topic: '+ msg.topic+' Message: '+str(msg.payload))
         mqttinput = self.config['mqttinput']
         for key in mqttinput:
@@ -221,14 +225,37 @@ class App:
                     rawid=m.group('rawid')
                     id=self.config['rawidsensorid'][rawid]
                     m=re.match(input.message_regexp,msg.payload.decode('UTF-8'))
-                    datetime=m.group('datetime')
+                    _datetime=m.group('datetime')
                     value=m.group('value')
                     if input.process_value!=None and input.process_value!="":
-                        value=eval(input.process_value, {"__builtins__": {}}, {"value":int(value),"round":round})
-                    self.logger.debug('rawid='+rawid+' id='+str(id)+' datetime='+datetime+' value='+str(value))
+                        if input.process_value_type==input.PROCESS_TYPE_EXPRESSION:
+                            value=eval(input.process_value, {"__builtins__": {}}, {"value":int(value),"round":round})
+                        elif input.process_value_type==input.PROCESS_TYPE_EXEC:
+                            value=self.exec_process(input.process_value,value)
+                    if input.process_time!=None and input.process_time!="":
+                        if input.process_time_type==input.PROCESS_TYPE_EXPRESSION:
+                            _datetime=eval(input.process_time, None, {"value":_datetime,"round":round})
+                        elif input.process_time_type==input.PROCESS_TYPE_EXEC:
+                            datetime=self.exec_process(input.process_time,datetime)
+                    self.logger.debug('rawid='+rawid+' id='+str(id)+' datetime='+str(_datetime)+' value='+str(value))
                 except KeyError:
                     pass
 
+    #
+    def exec_process(self, process, input):
+        self.logger.debug("exec_process")
+        self.logger.debug(input)
+        self.logger.debug(process)
+        #self=None
+        input_value=input
+        return_value=None
+        arvo="alku"
+        self.logger.debug(locals())
+        exec(process,globals(),locals())
+        self.logger.debug(locals())
+        self.logger.debug(return_value)
+        self.logger.debug("arvo="+str(arvo))
+        return return_value
 
     def load_mqtt_input(self):
         self.logger.debug('load_mqtt_input')
