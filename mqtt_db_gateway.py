@@ -7,7 +7,7 @@ import sys
 import os
 import signal
 import grp
-from configparser import SafeConfigParser
+from configparser import ConfigParser
 from configparser import NoSectionError
 from configparser import NoOptionError
 
@@ -21,6 +21,7 @@ from dateutil import tz
 
 import model
 
+
 def main():
     parser = argparse.ArgumentParser(description="MQTT DB gateway")
 
@@ -29,7 +30,6 @@ def main():
     parser.add_argument("--cfg", dest="cfg", action="store",
                         default="/etc/mqtt_db_gateway/mqtt_db_gateway.ini",
                         help="Full path to configuration")
-
 
     parser.add_argument("--pid", dest="pid", action="store",
                         default="/var/run/mqtt_db_gateway/mqtt_db_gateway.pid",
@@ -58,14 +58,14 @@ def main():
 
     elif parsed_args.method == 'reload':
         app = App(
-                cfg=parsed_args.cfg,
-                pid=parsed_args.pid,
-                nodaemon=parsed_args.nodaemon
+            cfg=parsed_args.cfg,
+            pid=parsed_args.pid,
+            nodaemon=parsed_args.nodaemon
         )
         app.reload()
 
-class App:
 
+class App:
     config = None
     logger = None
     loggerfh = None
@@ -74,28 +74,28 @@ class App:
     engine = None
     Session = None
 
-    def reload_program_config(self,signum, frame):
-        conf=self.readConfig(self._config_file)
+    def reload_program_config(self, signum, frame):
+        conf = self.readConfig(self._config_file)
         if conf is not None:
-            self.config=conf
+            self.config = conf
             self.close_resources()
             self.openConnections()
             self.createLogger()
 
-    def terminate(self,signum, frame):
+    def terminate(self, signum, frame):
         self.logger.info("terminate")
 
-    def readConfig(self,conf_file=None):
-        config = SafeConfigParser()
-        if (conf_file is None):
+    def readConfig(self, conf_file=None):
+        config = ConfigParser()
+        if conf_file is None:
             conf_file = 'mqtt_db_gateway.ini'
         config.read(conf_file)
         confData = {}
-        #Mandatory configurations
+        # Mandatory configurations
         try:
             sqlalchemy = {}
-            sqlalchemy['uri'] = config.get('sqlalchemy','uri')
-            sqlalchemy['echo'] = config.getboolean('sqlalchemy','echo')
+            sqlalchemy['uri'] = config.get('sqlalchemy', 'uri')
+            sqlalchemy['echo'] = config.getboolean('sqlalchemy', 'echo')
 
             mqttbroker = {}
             mqttbroker['host'] = config.get('mqttbroker', 'host')
@@ -105,29 +105,28 @@ class App:
             groupname = config.get('daemon', 'group')
             daemonData['groupid'] = grp.getgrnam(groupname)[2]
 
-
         except NoSectionError:
             if self.daemon is not None and self.daemon.is_open:
-                self.logger.error("Error in "+str(conf_file))
+                self.logger.error("Error in " + str(conf_file))
                 return None
             else:
-                print ('Error in '+conf_file)
+                print('Error in ' + conf_file)
                 exit()
 
-        #Optional configurations
+        # Optional configurations
         loggerData = {}
         try:
             try:
                 loggerData['formatter'] = config.get('logger', 'formatter')
-            except  NoOptionError:
+            except NoOptionError:
                 loggerData['formatter'] = None
             try:
                 loggerData['file'] = config.get('logger', 'file')
-            except  NoOptionError:
+            except NoOptionError:
                 loggerData['file'] = None
             try:
                 loggerData['level'] = config.get('logger', 'level')
-            except  NoOptionError:
+            except NoOptionError:
                 loggerData['level'] = None
         except NoSectionError:
             loggerData['formatter'] = None
@@ -150,7 +149,7 @@ class App:
         self._pid = pid
         self._nodaemon = nodaemon
 
-    def program_cleanup(self,signum, frame):
+    def program_cleanup(self, signum, frame):
         self.logger.info('Program cleanup')
         self.close_resources()
         raise SystemExit('Terminating on signal {0}'.format(signum))
@@ -160,30 +159,25 @@ class App:
             self.mqttclient.close()
         if self.engine is not None:
             self.engine.close()
-        
-#        if self.db is not None:
-#            self.cursor.close(
-#
-#            )
-#            self.db.close()
-#        if self.ser is not None:
-#            self.ser.close()
 
     def createLogger(self):
         if self.logger is not None and self.daemon is not None and self.daemon.is_open:
             self.logger.Debug("Create logger")
         else:
-            print ('Create logger')
+            print('Create logger')
 
         loggerConf = self.config['logger']
         if self.logger is None:
             self.logger = logging.getLogger('MQTT gateway')
 
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s" if loggerConf["formatter"]==None else loggerConf["formatter"])
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s" if loggerConf["formatter"] is not None else
+            loggerConf["formatter"])
         if self.loggerfh is not None:
             self.loggerfh.close()
             self.logger.removeHandler(self.loggerfh)
-        self.loggerfh = logging.FileHandler("/var/log/mqttgateway/mqttgateway.log" if loggerConf["file"]==None else loggerConf["file"])
+        self.loggerfh = logging.FileHandler(
+            "/var/log/mqttgateway/mqttgateway.log" if loggerConf["file"] is not None else loggerConf["file"])
         self.loggerfh.setFormatter(formatter)
         self.logger.addHandler(self.loggerfh)
         level = {
@@ -194,67 +188,72 @@ class App:
             "DEBUG": logging.DEBUG,
             "NOTSET": logging.NOTSET
         }
-        self.logger.setLevel(level.get(loggerConf["level"],logging.INFO))
+        self.logger.setLevel(level.get(loggerConf["level"], logging.INFO))
         self.logger.debug('Logger created.')
 
-#    def read_subscriptions_conf(self):
-
+    #    def read_subscriptions_conf(self):
 
     # The callback for when the client receives a CONNACK response from the server.
     def on_connect(self, client, userdata, flags, rc):
-        self.logger.debug('Connected to MQTT broker with result code '+str(rc))
+        self.logger.debug('Connected to MQTT broker with result code ' + str(rc))
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
         mqttinput = self.config['mqttinput']
         self.logger.debug(mqttinput)
-        for key in  mqttinput:
+        for key in mqttinput:
             input = mqttinput[key]
             client.subscribe(input.topic)
-            self.logger.debug('Subscribed to '+input.topic)
+            self.logger.debug('Subscribed to ' + input.topic)
 
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
         from datetime import datetime
-        self.logger.debug('Got message Topic: '+ msg.topic+' Message: '+str(msg.payload))
+        self.logger.debug('Got message Topic: ' + msg.topic + ' Message: ' + str(msg.payload))
         mqttinput = self.config['mqttinput']
         for key in mqttinput:
-            if mqtt.topic_matches_sub(key,msg.topic):
+            if mqtt.topic_matches_sub(key, msg.topic):
                 try:
                     input = mqttinput[key]
-                    m=re.match(input.topic_regexp,msg.topic)
-                    rawid=m.group('rawid')
-                    id=self.config['rawidsensorid'][rawid]
-                    m=re.match(input.message_regexp,msg.payload.decode('UTF-8'))
-                    _datetime=m.group('datetime')
-                    value=m.group('value')
-                    if input.process_value!=None and input.process_value!="":
-                        if input.process_value_type==input.PROCESS_TYPE_EXPRESSION:
-                            value=eval(input.process_value, {"__builtins__": {}}, {"value":int(value),"round":round})
-                        elif input.process_value_type==input.PROCESS_TYPE_EXEC:
-                            value=self.exec_process(input.process_value,value)
-                    if input.process_time!=None and input.process_time!="":
-                        if input.process_time_type==input.PROCESS_TYPE_EXPRESSION:
-                            _datetime=eval(input.process_time, None, {"value":_datetime,"round":round})
-                        elif input.process_time_type==input.PROCESS_TYPE_EXEC:
-                            datetime=self.exec_process(input.process_time,datetime)
-                    self.logger.debug('rawid='+rawid+' id='+str(id)+' datetime='+str(_datetime)+' value='+str(value))
+                    m = re.match(input.topic_regexp, msg.topic)
+                    rawid = m.group('rawid')
+                    id = self.config['rawidsensorid'][rawid]
+                    m = re.match(input.message_regexp, msg.payload.decode('UTF-8'))
+                    _datetime = m.group('datetime')
+                    value = m.group('value')
+                    if input.process_value is not None and input.process_value != "":
+                        if input.process_value_type == input.PROCESS_TYPE_EXPRESSION:
+                            value = eval(input.process_value, {"__builtins__": {}},
+                                         {"value": int(value), "round": round})
+                        elif input.process_value_type == input.PROCESS_TYPE_EXEC:
+                            value = self.exec_process(input.process_value, value)
+                    if input.process_time is not None and input.process_time != "":
+                        if input.process_time_type == input.PROCESS_TYPE_EXPRESSION:
+                            _datetime = eval(input.process_time, None, {"value": _datetime, "round": round})
+                        elif input.process_time_type == input.PROCESS_TYPE_EXEC:
+                            datetime = self.exec_process(input.process_time, datetime)
+                    self.logger.debug(
+                        'rawid=' + rawid + ' id=' + str(id) + ' datetime=' + str(_datetime) + ' value=' + str(value))
+                    data = model.Data(sensorid=id, time=_datetime, value=value)
+                    session = self.Session()
+                    session.add(data)
+                    session.commit()
                 except KeyError:
-                    pass
+                    self.logger.debug("rawid '" + rawid + "' not found.")
 
     #
     def exec_process(self, process, input):
         self.logger.debug("exec_process")
         self.logger.debug(input)
         self.logger.debug(process)
-        #self=None
-        input_value=input
-        return_value=None
-        arvo="alku"
+        # self=None
+        input_value = input
+        return_value = None
+        arvo = "alku"
         self.logger.debug(locals())
-        exec(process,globals(),locals())
+        exec(process, globals(), locals())
         self.logger.debug(locals())
         self.logger.debug(return_value)
-        self.logger.debug("arvo="+str(arvo))
+        self.logger.debug("arvo=" + str(arvo))
         return return_value
 
     def load_mqtt_input(self):
@@ -263,7 +262,7 @@ class App:
         mqttInput = {}
         for instance in session.query(model.Mqtt_input).all():
             self.logger.debug(instance)
-            mqttInput[instance.topic]=instance
+            mqttInput[instance.topic] = instance
         self.config['mqttinput'] = mqttInput
         self.logger.debug('Loaded subscriptions')
         self.logger.debug(mqttInput)
@@ -274,20 +273,19 @@ class App:
         rawidsensorid = {}
         for instance in session.query(model.Rawid_sensorid).all():
             self.logger.debug(instance)
-            rawidsensorid[instance.rawid]=instance.sensorid
+            rawidsensorid[instance.rawid] = instance.sensorid
         self.config['rawidsensorid'] = rawidsensorid
         self.logger.debug('Loaded rawid sensorid pairs')
         self.logger.debug(rawidsensorid)
 
-
     def openConnections(self):
         self.logger.debug("openConnections")
 
-#        try:
+        #        try:
         self.logger.debug("Open DB connection")
         sqlalchemyConf = self.config['sqlalchemy']
-        self.logger.debug("URI="+sqlalchemyConf['uri'])
-        self.logger.debug("Echo="+str(sqlalchemyConf['echo']))
+        self.logger.debug("URI=" + sqlalchemyConf['uri'])
+        self.logger.debug("Echo=" + str(sqlalchemyConf['echo']))
         self.logger.debug("Create engine")
         self.engine = sqlalchemy.create_engine(sqlalchemyConf['uri'], echo=sqlalchemyConf['echo'])
         self.logger.debug("Connect")
@@ -295,9 +293,9 @@ class App:
         self.Session = sessionmaker(bind=self.engine)
         self.load_mqtt_input()
         self.load_rawid_sensorid()
-#        except Exception as ex:
-#            self.logger.error('Error opening DB: '+ str(ex))
-#            self.logger.error(ex)
+        #        except Exception as ex:
+        #            self.logger.error('Error opening DB: '+ str(ex))
+        #            self.logger.error(ex)
 
         self.logger.debug("Open MQTT broker connection.")
         # connect
@@ -306,13 +304,12 @@ class App:
         self.mqttclient.on_message = self.on_message
 
         brokerConf = self.config['mqttbroker']
-        self.mqttclient.connect(brokerConf['host'],int(brokerConf['port']), 60)
+        self.mqttclient.connect(brokerConf['host'], int(brokerConf['port']), 60)
         # NonBlocking call that processes network traffic, dispatches callbacks and
         # handles reconnecting.
         # Other loop*() functions are available that give a threaded interface and a
         # manual interface.
         self.mqttclient.loop_start()
-
 
     def run(self):
         self.openConnections()
@@ -344,11 +341,9 @@ class App:
     def pid(self):
         return self._pid
 
-
     @property
     def nodaemon(self):
         return self._nodaemon
-
 
     def stop(self):
         try:
@@ -376,16 +371,16 @@ class App:
         sys.stdout.write("Ok")
 
     def start(self):
-        self.config=self.readConfig(self._config_file)
+        self.config = self.readConfig(self._config_file)
         self.daemon = DaemonContext(pidfile=PidFile(self.pid)
-                                   ,signal_map={signal.SIGTERM: self.program_cleanup,
-                                                signal.SIGHUP: self.terminate,
-                                                signal.SIGUSR1: self.reload_program_config}
-#                                   ,files_preserve=(sys.stdout)
-                                   ,stdout=open("/tmp/daemon_stdout.log",'w')
-                                   ,stderr=open("/tmp/daemon_stderr.log",'w')
-                                   ,gid=self.config["daemon"]["groupid"])
-        print ("daemon created")
+                                    , signal_map={signal.SIGTERM: self.program_cleanup,
+                                                  signal.SIGHUP: self.terminate,
+                                                  signal.SIGUSR1: self.reload_program_config}
+                                    #                                   ,files_preserve=(sys.stdout)
+                                    , stdout=open("/tmp/daemon_stdout.log", 'w')
+                                    , stderr=open("/tmp/daemon_stderr.log", 'w')
+                                    , gid=self.config["daemon"]["groupid"])
+        print("daemon created")
         if self.nodaemon:
             print("no daemon")
             self.daemon.detach_process = False
@@ -394,15 +389,14 @@ class App:
         try:
             print("before daemon")
             self.daemon.open()
-            print ("after daemon")
+            print("after daemon")
             self.createLogger()
             self.logger.debug('After open')
             self.run()
         except:
-            print ("Unexpected error:", sys.exc_info()[0])
+            print("Unexpected error:", sys.exc_info()[0])
             raise
 
 
-
 if __name__ == "__main__":
-  main()
+    main()
