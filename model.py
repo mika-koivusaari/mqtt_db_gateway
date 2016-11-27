@@ -1,9 +1,10 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, Decimal
+from sqlalchemy import Column, Integer, String, DateTime, DECIMAL
 
 Base = declarative_base()
 
-class Mqtt_input(Base):
+
+class MqttInput(Base):
     __tablename__ = 'mqtt_input'
 
     PROCESS_TYPE_EXPRESSION = 1
@@ -20,23 +21,25 @@ class Mqtt_input(Base):
 
     def __repr__(self):
         return "<Input(topic='%s', topic_regexp='%s', message_regexp='%s', process_value='%s', process_time='%s')>" % (
-                             self.topic, self.topic_regexp, self.message_regexp, self.process_value, self.process_time)
+            self.topic, self.topic_regexp, self.message_regexp, self.process_value, self.process_time)
 
-class Rawid_sensorid(Base):
+
+class RawidSensorid(Base):
     __tablename__ = 'rawid_sensorid'
 
     rawid = Column(String, primary_key=True)
     sensorid = Column(Integer)
 
     def __repr__(self):
-        return "<Rawid_sensorid(rawid='%s', sensorid='%s')>" % (self.rawid, self.sensorid)
+        return "<RawidSensorid(rawid='%s', sensorid='%s')>" % (self.rawid, self.sensorid)
+
 
 class Data(Base):
     __tablename__ = 'data'
 
-    sensorid = Column(Integer, primary_key = True)
-    time = Column(Date, primary_key = True)
-    value = Column(Decimal)
+    sensorid = Column(Integer, primary_key=True)
+    time = Column(DateTime, primary_key=True)
+    value = Column(DECIMAL)
 
     def __repr__(self):
         return "<Data(sensorid='%s', time='%s', value='%s')>" % (self.sensorid, self.time, self.value)

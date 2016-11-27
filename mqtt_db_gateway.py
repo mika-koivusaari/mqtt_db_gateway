@@ -260,7 +260,7 @@ class App:
         self.logger.debug('load_mqtt_input')
         session = self.Session()
         mqttInput = {}
-        for instance in session.query(model.Mqtt_input).all():
+        for instance in session.query(model.MqttInput).all():
             self.logger.debug(instance)
             mqttInput[instance.topic] = instance
         self.config['mqttinput'] = mqttInput
@@ -271,7 +271,7 @@ class App:
         self.logger.debug('load_rawid_sensorid')
         session = self.Session()
         rawidsensorid = {}
-        for instance in session.query(model.Rawid_sensorid).all():
+        for instance in session.query(model.RawidSensorid).all():
             self.logger.debug(instance)
             rawidsensorid[instance.rawid] = instance.sensorid
         self.config['rawidsensorid'] = rawidsensorid
