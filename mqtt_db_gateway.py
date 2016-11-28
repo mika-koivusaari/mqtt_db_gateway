@@ -171,13 +171,14 @@ class App:
             self.logger = logging.getLogger('MQTT gateway')
 
         formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s" if loggerConf["formatter"] is not None else
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s" if loggerConf["formatter"] is None else
             loggerConf["formatter"])
         if self.loggerfh is not None:
             self.loggerfh.close()
             self.logger.removeHandler(self.loggerfh)
         self.loggerfh = logging.FileHandler(
-            "/var/log/mqttgateway/mqttgateway.log" if loggerConf["file"] is not None else loggerConf["file"])
+            "/var/log/mqttgateway/mqttgateway.log" if loggerConf["file"] is None else loggerConf["file"])
+        self.loggerfh = logging.FileHandler("/var/log/mqttgateway/mqttgateway.log")
         self.loggerfh.setFormatter(formatter)
         self.logger.addHandler(self.loggerfh)
         level = {
