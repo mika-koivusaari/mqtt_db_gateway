@@ -1,4 +1,7 @@
 from unittest import TestCase
+from unittest.mock import patch
+
+from mqtt_db_gateway import App
 
 
 class TestApp(TestCase):
@@ -8,8 +11,22 @@ class TestApp(TestCase):
     def test_terminate(self):
         self.fail()
 
-    def test_readConfig(self):
-        self.fail()
+    @patch('mqtt_db_gateway.grp')
+    @patch('mqtt_db_gateway.ConfigParser')
+    def test_readConfig_fileread(self,configparsermock,grpmock):
+        app = App(
+            cfg='cfg',
+            pid='pid',
+            nodaemon=True
+        )
+
+        instance = configparsermock.return_value
+
+        grpmock.getgrnam.return_value(('name','passwd',1,'users'))
+
+        app.readConfig('file.ini')
+
+        instance.read.assert_called_with('file.ini')
 
     def test_program_cleanup(self):
         self.fail()
