@@ -90,9 +90,7 @@ class TestApp(TestCase):
         grpmock.getgrnam.return_value(('name', 'passwd', 1, 'users'))
 
         def get_side_effect(section, key):
-            print (section + ', ' + key)
             if section == 'sqlalchemy' and key == 'uri':
-                print("error")
                 raise NoSectionError('Mandatory config test')
             else:
                 return DEFAULT
@@ -100,11 +98,50 @@ class TestApp(TestCase):
         instance.get.side_effect = get_side_effect
         self.assertIsNone(app.readConfig(conf_file=None))
 
-    def test_program_cleanup(self):
-        self.fail()
+    @patch('mqtt_db_gateway.App.mqttclient')
+    @patch('mqtt_db_gateway.App.engine')
+    def test_program_cleanup_all(self,enginemock,mqttclientmock):
+        app = App(
+            cfg='cfg',
+            pid='pid',
+            nodaemon=False
+        )
 
-    def test_close_resources(self):
-        self.fail()
+        app.engine = enginemock
+        app.mqttclient = mqttclientmock
+
+        app.close_resources()
+
+        mqttclientmock.close.assert_called_with()
+        enginemock.close.assert_called_with()
+
+    @patch('mqtt_db_gateway.App.engine')
+    def test_program_cleanup_engine(self, enginemock):
+        app = App(
+            cfg='cfg',
+            pid='pid',
+            nodaemon=False
+        )
+
+        app.engine = enginemock
+
+        app.close_resources()
+
+        enginemock.close.assert_called_with()
+
+    @patch('mqtt_db_gateway.App.mqttclient')
+    def test_program_cleanup_mqtt(self, mqttclientmock):
+        app = App(
+            cfg='cfg',
+            pid='pid',
+            nodaemon=False
+        )
+
+        app.mqttclient = mqttclientmock
+
+        app.close_resources()
+
+        mqttclientmock.close.assert_called_with()
 
     def test_createLogger(self):
         self.fail()
