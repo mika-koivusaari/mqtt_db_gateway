@@ -43,3 +43,13 @@ class Data(Base):
 
     def __repr__(self):
         return "<Data(sensorid='%s', time='%s', value='%s')>" % (self.sensorid, self.time, self.value)
+
+class DataText(Base):
+    __tablename__ = 'datatext'
+
+    sensorid = Column(Integer, primary_key=True)
+    time = Column(DateTime, primary_key=True)
+    text = Column(String)
+
+    def __repr__(self):
+        return "<DataText(sensorid='%s', time='%s', text='%s')>" % (self.sensorid, self.time, self.text)

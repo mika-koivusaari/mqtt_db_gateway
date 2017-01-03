@@ -167,6 +167,7 @@ class App:
             print('Create logger')
 
         loggerConf = self.config['logger']
+        print(loggerConf)
         if self.logger is None:
             self.logger = logging.getLogger('MQTT gateway')
 
@@ -178,7 +179,7 @@ class App:
             self.logger.removeHandler(self.loggerfh)
         self.loggerfh = logging.FileHandler(
             "/var/log/mqttgateway/mqttgateway.log" if loggerConf["file"] is None else loggerConf["file"])
-        self.loggerfh = logging.FileHandler("/var/log/mqttgateway/mqttgateway.log")
+#        self.loggerfh = logging.FileHandler("/var/log/mqttgateway/mqttgateway.log")
         self.loggerfh.setFormatter(formatter)
         self.logger.addHandler(self.loggerfh)
         level = {
@@ -191,6 +192,7 @@ class App:
         }
         self.logger.setLevel(level.get(loggerConf["level"], logging.INFO))
         self.logger.debug('Logger created.')
+        print('logger created.')
 
     #    def read_subscriptions_conf(self):
 
@@ -219,7 +221,10 @@ class App:
                     rawid = m.group('rawid')
                     id = self.config['rawidsensorid'][rawid]
                     m = re.match(input.message_regexp, msg.payload.decode('UTF-8'))
-                    _datetime = m.group('datetime')
+                    try: #datetime is not mandatory
+                        _datetime = m.group('datetime')
+                    except IndexError:
+                        _datetime = None
                     value = m.group('value')
                     if input.process_value is not None and input.process_value != "":
                         if input.process_value_type == input.PROCESS_TYPE_EXPRESSION:
@@ -231,10 +236,16 @@ class App:
                         if input.process_time_type == input.PROCESS_TYPE_EXPRESSION:
                             _datetime = eval(input.process_time, None, {"value": _datetime, "round": round})
                         elif input.process_time_type == input.PROCESS_TYPE_EXEC:
-                            datetime = self.exec_process(input.process_time, datetime)
-                    self.logger.debug(
-                        'rawid=' + rawid + ' id=' + str(id) + ' datetime=' + str(_datetime) + ' value=' + str(value))
-                    data = model.Data(sensorid=id, time=_datetime, value=value)
+                            _datetime = self.exec_process(input.process_time, datetime)
+                    else: #no timestamp in input, use current time
+                        _datetime = datetime.now()
+                        self.logger.debug('rawid=' + rawid + ' id=' + str(id) + ' datetime=' + str(_datetime) + ' value=' + str(value))
+                    if isinstance(value,(int,float)):
+                        self.logger.debug('Value is number, save to data.')
+                        data = model.Data(sensorid=id, time=_datetime, value=value)
+                    else:
+                        self.logger.debug('Value is text, save to datatext.')
+                        data = model.DataText(sensorid=id, time=_datetime, text=value)
                     session = self.Session()
                     session.add(data)
                     session.commit()
