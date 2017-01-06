@@ -1,3 +1,8 @@
+[sqlalchemy]
+uri = mysql+pymysql://weather_test:XXXX@localhost/weather_test
+echo = True
+pool_recycle = 3600
+
 [mqttbroker]
 host = localhost
 port = 1883

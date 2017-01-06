@@ -96,6 +96,7 @@ class App:
             sqlalchemy = {}
             sqlalchemy['uri'] = config.get('sqlalchemy', 'uri')
             sqlalchemy['echo'] = config.getboolean('sqlalchemy', 'echo')
+            sqlalchemy['pool_recycle'] = config.getint('sqlalchemy','pool_recycle')
 
             mqttbroker = {}
             mqttbroker['host'] = config.get('mqttbroker', 'host')
@@ -299,7 +300,7 @@ class App:
         self.logger.debug("URI=" + sqlalchemyConf['uri'])
         self.logger.debug("Echo=" + str(sqlalchemyConf['echo']))
         self.logger.debug("Create engine")
-        self.engine = sqlalchemy.create_engine(sqlalchemyConf['uri'], echo=sqlalchemyConf['echo'])
+        self.engine = sqlalchemy.create_engine(sqlalchemyConf['uri'], echo=sqlalchemyConf['echo'], pool_recycle=sqlalchemyConf['pool_recycle'])
         self.logger.debug("Connect")
         self.engine.connect()
         self.Session = sessionmaker(bind=self.engine)
