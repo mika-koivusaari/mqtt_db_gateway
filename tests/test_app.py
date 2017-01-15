@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest import main
 from unittest.mock import patch
 from unittest.mock import DEFAULT
 
@@ -187,3 +188,6 @@ class TestApp(TestCase):
 
     def test_start(self):
         self.fail()
+
+if __name__ == '__main__':
+    main()
