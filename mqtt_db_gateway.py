@@ -1,25 +1,21 @@
 #!/usr/bin/python
-import logging
-import time
-import re
 import argparse
-import sys
-import os
-import signal
 import grp
+import logging
+import os
+import re
+import signal
+import sys
+import time
 from configparser import ConfigParser
-from configparser import NoSectionError
 from configparser import NoOptionError
+from configparser import NoSectionError
 
 import paho.mqtt.client as mqtt
-from pep3143daemon import DaemonContext, PidFile
 import sqlalchemy
+from app import model
+from pep3143daemon import DaemonContext, PidFile
 from sqlalchemy.orm import sessionmaker
-
-from datetime import datetime
-from dateutil import tz
-
-import model
 
 
 def main():
