@@ -24,6 +24,7 @@ class App:
     engine = None
     Session = None
 
+    #daemon run method, maybe do something here in the future?
     def run(self):
         self.openConnections()
         self.logger.debug("Run")
@@ -41,6 +42,7 @@ class App:
                 self.logger.error(sys.exc_info()[2])
                 raise
 
+    #called when process gets SIGUSR1
     def reload_program_config(self, signum, frame):
         conf = self.readConfig(self._config_file)
         if conf is not None:
@@ -49,9 +51,11 @@ class App:
             self.openConnections()
             self.createLogger()
 
+    #called when program gets SIGHUP
     def terminate(self, signum, frame):
         self.logger.info("terminate")
 
+    #called when program gets SIGTERM
     def program_cleanup(self, signum, frame):
         self.logger.info('Program cleanup')
         self.close_resources()
@@ -179,51 +183,58 @@ class App:
 
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
-        from datetime import datetime
-        from dateutil import tz
-        self.logger.debug('Got message Topic: ' + msg.topic + ' Message: ' + str(msg.payload))
-        mqttinput = self.config['mqttinput']
-        for key in mqttinput:
-            if mqtt.topic_matches_sub(key, msg.topic):
-                try:
-                    input = mqttinput[key]
-                    m = re.match(input.topic_regexp, msg.topic)
-                    rawid = m.group('rawid')
-                    id = self.config['rawidsensorid'][rawid]
-                    m = re.match(input.message_regexp, msg.payload.decode('UTF-8'))
-                    try: #datetime is not mandatory
-                        _datetime = m.group('datetime')
-                    except IndexError:
-                        _datetime = None
-                    value = m.group('value')
-                    if input.process_value is not None and input.process_value != "":
-                        if input.process_value_type == input.PROCESS_TYPE_EXPRESSION:
-                            value = eval(input.process_value, {"__builtins__": {}},
-                                         {"value": int(value), "round": round})
-                        elif input.process_value_type == input.PROCESS_TYPE_EXEC:
-                            value = self.exec_process(input.process_value, value)
-                    if input.process_time is not None and input.process_time != "":
-                        if input.process_time_type == input.PROCESS_TYPE_EXPRESSION:
-                            print(input.process_time)
-                            _datetime = eval(input.process_time, None, {"value": _datetime, "round": round, "datetime": datetime, "tz": tz})
-                        elif input.process_time_type == input.PROCESS_TYPE_EXEC:
-                            _datetime = self.exec_process(input.process_time, datetime)
-                    else: #no timestamp in input, use current time
-                        _datetime = datetime.now()
-                        self.logger.debug('rawid=' + rawid + ' id=' + str(id) + ' datetime=' + str(_datetime) + ' value=' + str(value))
-                    if isinstance(value,(int,float)):
-                        self.logger.debug('Value is number, save to data.')
-                        data = model.Data(sensorid=id, time=_datetime, value=value)
-                    else:
-                        self.logger.debug('Value is text, save to datatext.')
-                        data = model.DataText(sensorid=id, time=_datetime, text=value)
-                    session = self.Session()
-                    session.add(data)
-                    session.commit()
-                except KeyError:
-                    self.logger.debug("rawid '" + rawid + "' not found.")
+        try:
+            #TODO figure out a better place for these
+            from datetime import datetime
+            from dateutil import tz
+            self.logger.debug('Got message Topic: ' + msg.topic + ' Message: ' + str(msg.payload))
+            mqttinput = self.config['mqttinput']
+            for key in mqttinput:
+                if mqtt.topic_matches_sub(key, msg.topic):
+                    try:
+                        input = mqttinput[key]
+                        m = re.match(input.topic_regexp, msg.topic)
+                        rawid = m.group('rawid')
+                        id = self.config['rawidsensorid'][rawid]
+                        m = re.match(input.message_regexp, msg.payload.decode('UTF-8'))
+                        try: #datetime is not mandatory
+                            _datetime = m.group('datetime')
+                        except IndexError:
+                            _datetime = None
+                        value = m.group('value')
+                        if input.process_value is not None and input.process_value != "":
+                            if input.process_value_type == input.PROCESS_TYPE_EXPRESSION:
+                                value = eval(input.process_value, {"__builtins__": {}},
+                                             {"value": int(value), "round": round})
+                            elif input.process_value_type == input.PROCESS_TYPE_EXEC:
+                                value = self.exec_process(input.process_value, value)
+                        if input.process_time is not None and input.process_time != "":
+                            if input.process_time_type == input.PROCESS_TYPE_EXPRESSION:
+                                print(input.process_time)
+                                _datetime = eval(input.process_time, None, {"value": _datetime, "round": round, "datetime": datetime, "tz": tz})
+                            elif input.process_time_type == input.PROCESS_TYPE_EXEC:
+                                _datetime = self.exec_process(input.process_time, datetime)
+                        else: #no timestamp in input, use current time
+                            _datetime = datetime.now()
+                            self.logger.debug('rawid=' + rawid + ' id=' + str(id) + ' datetime=' + str(_datetime) + ' value=' + str(value))
+                        if isinstance(value,(int,float)):
+                            self.logger.debug('Value is number, save to data.')
+                            data = model.Data(sensorid=id, time=_datetime, value=value)
+                        else:
+                            self.logger.debug('Value is text, save to datatext.')
+                            data = model.DataText(sensorid=id, time=_datetime, text=value)
+                        session = self.Session()
+                        session.add(data)
+                        session.commit()
+                    except KeyError:
+                        self.logger.warning("rawid '" + rawid + "' not found.")
+        except:
+            self.logger.error("Error receiving topic:'" + msg.topic + "' message:'" + msg.payload.decode('UTF-8') +"'")
+            self.logger.error(str(sys.exc_info()[0]))
+            self.logger.error(str(sys.exc_info()[1]))
+            self.logger.error(str(sys.exc_info()[2]))
 
-    #
+    #TODO does not work yet:)
     def exec_process(self, process, input):
         self.logger.debug("exec_process")
         self.logger.debug(input)
