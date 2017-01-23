@@ -13,6 +13,8 @@ import sqlalchemy
 from app import model
 from sqlalchemy.orm import sessionmaker
 
+from pep3143daemon import DaemonContext
+
 class App:
     config = None
     logger = None
