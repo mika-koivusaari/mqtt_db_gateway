@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from pep3143daemon import DaemonContext, PidFile
 import signal
 import os
